@@ -11,7 +11,7 @@ GPIO.setup(right_sensor, GPIO.IN)
 
 try:
 	while True:
-		print("Left sensor active:", bool(GPIO.input(left_sensor), "  Right sensor active:", bool(GPIO.input(right_sensor))
+		print("Left sensor active:", bool(GPIO.input(left_sensor)), "  Right sensor active:", bool(GPIO.input(right_sensor)))
 		sleep(0.5)
 except:
 	GPIO.cleanup()
