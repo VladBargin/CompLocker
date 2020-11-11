@@ -7,7 +7,14 @@ class keypad():
         GPIO.setmode(GPIO.BOARD)
 
         # CONSTANTS 
-        if columnCount is 3:
+        if columnCount is 2:
+            self.KEYPAD = [
+                [1,2,3],
+                [4,5,6]
+            ]
+            self.ROW = [3, 26]
+            self.COLUMN = [24, 21, 19]
+        elif columnCount is 3:
             self.KEYPAD = [
                 [1,2,3],
                 [4,5,6],
@@ -15,8 +22,8 @@ class keypad():
                 ["*",0,"#"]
             ]
 
-            self.ROW         = [26,24,23,22]
-            self.COLUMN      = [21,19,10]
+            self.ROW         = [3, 28,27,26]
+            self.COLUMN      = [24,21,19]
         
         elif columnCount is 4:
             self.KEYPAD = [
@@ -25,8 +32,8 @@ class keypad():
                 [7,8,9,"C"],
                 ["*",0,"#","D"]
             ]
-            self.ROW         = [3,5,7,11]
-            self.COLUMN      = [16,18,22,26]
+            self.ROW         = [0,1,2,7]
+            self.COLUMN      = [8,9,10,11]
         else:
             return
      
@@ -34,11 +41,13 @@ class keypad():
          
         # Set all columns as output low
         for j in range(len(self.COLUMN)):
+#            print(self.COLUMN[j])
             GPIO.setup(self.COLUMN[j], GPIO.OUT)
             GPIO.output(self.COLUMN[j], GPIO.LOW)
          
         # Set all rows as input
         for i in range(len(self.ROW)):
+ #           print(self.ROW[i])
             GPIO.setup(self.ROW[i], GPIO.IN, pull_up_down=GPIO.PUD_UP)
          
         # Scan rows for pushed key/button

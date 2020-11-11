@@ -4,7 +4,7 @@ from keypad import keypad
 
 GPIO.setwarnings(False)
 
-kp = keypad()
+kp = keypad(2)
 
 while True:
 	digit = None
@@ -12,7 +12,7 @@ while True:
 		digit = kp.getKey()
 
 	print(digit)
-	if digit == '#':
+	if digit == 6:
 		break
 
 	while kp.getKey() != None:
