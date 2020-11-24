@@ -10,6 +10,7 @@ all: default
 	
 init: init.o
 	$(CC) -o init init.o $(LDFLAGS)
+
 	
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
