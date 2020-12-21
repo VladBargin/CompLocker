@@ -1,0 +1,198 @@
+#include <pigpio.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/time.h>
+#include <wiringPi.h>
+#include <string.h>
+
+// Add TFTGL library
+#include <tftgl.h>
+
+// Add NANOVG library
+#include <nanovg.h>
+#define NANOVG_GLES2_IMPLEMENTATION	// Use GLES 2 implementation.
+#include <nanovg_gl.h>
+#include <bcm2835.h>
+
+static volatile uint32_t* gpioData = NULL;
+
+#define GPIO_GPFSET0 (BCM2835_GPSET0/4)
+#define GPIO_GPFCLR0 (BCM2835_GPCLR0/4)
+#define GPIO_WRITE_PIN(pinnum, pinstate) \
+	*(gpioData + (pinstate ? GPIO_GPFSET0 : GPIO_GPFCLR0)) = (1 << pinnum);
+
+
+int handle;
+int getValueX();
+int getValueY();
+int isPressed = 0; // 1 if the touch screen is pressed
+int touch_down = 0;
+struct NVGcontext* vg;
+GLint width, height;
+int current_scene = 0;
+
+struct Text {
+	char * s;
+	int len, max_len;
+
+	int font, font_size;
+	int x, y, dx, dy;
+	int r, g, b;
+};
+
+struct Box {
+	int x1, y1, x2, y2;
+	int r, g, b, a, w;
+};
+
+struct Rect {
+	int x1, y1, x2, y2;
+	int r, g, b, a;
+}
+
+
+
+struct Object [
+	int scene, id, priority;
+	bool can_touch, has_focus;
+
+	int cnt_boxes, cnt_rects, cnt_texts;
+	struct *Box boxes;
+	struct *Rects rects;
+	struct *Text texts;
+};
+
+void register_touch(int x, int y) {
+
+}
+
+int main()
+{
+    int speed = 1000000;
+
+    // GPIO initialization
+    if (gpioInitialise() < 0) {
+        printf("initialize error");
+        exit(1);
+    }
+
+    // SPI initialization
+
+    handle = spiOpen(0, speed, 0);
+    if (handle < 0) {
+        printf("SPI open error");
+    }
+
+	double pxRatio;
+	unsigned int i;
+
+	// Initialize tftgl!
+	if(tftglInit(TFTGL_LANDSCAPE) != TFTGL_OK){
+		fprintf(stderr, "Failed to initialize TFTGL library! Error: %s\n",
+			tftglGetErrorStr());
+		return EXIT_FAILURE;
+	}
+
+	// Set brightness to full 100%
+	tftgSetBrightness(255);
+
+	// Get viewport size
+	GLint viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	printf("TFT display initialized with EGL! Screen size: %dx%d\n",
+		viewport[2], viewport[3]);
+
+	width = viewport[2];
+	height = viewport[3];
+
+	glClear(GL_COLOR_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
+
+	vg = nvgCreateGLES2(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
+	nvgBeginFrame(vg, width, height, 1.0);
+
+	// Touch and draw variables
+	int px = 2*width, py = 2*height;
+	int mdraw = 13;
+	int draw = mdraw - 1;
+	int cycles_to_next_touch = 4;
+
+	while (1)
+    {
+		// REGISTER TOUCH INPUT
+		{
+	        int x = 0, y = 0;
+			int tcnt = 0;
+			for (int i = 0; i < 20; i++) {
+		        int tx = getValueX(), ty = getValueY();
+				if (tx < width && ty < height) {
+					if(px >= width || ((px - tx) * (px - tx) + (py - ty) * (py - ty) < 20000)) {
+						tcnt++;
+						x += tx; y += ty;
+					}
+				}
+				delay(1);
+			}
+			if (tcnt > 0) {
+				x /= tcnt;
+				y /= tcnt;
+				px = x;
+				py = y;
+				if (touch_down == 0) {
+					register_touch(x, y);
+				}
+				touch_down = cycles_to_next_touch - 1;
+			} else {
+				px = 2*width;
+				py = 2*height;
+				if (touch_down > 0) {
+					touch_down--;
+				}
+			}
+		}
+		// REGISTER TOUCH INPUT
+
+
+
+
+
+		// Draw frame every 'mdraw' cycles of this loop. The neccesay delay is provided by reading the touch input data
+		if (draw) {
+			nvgEndFrame(vg);
+			tftglUploadFbo();
+			nvgBeginFrame(vg, width, height, 1.0);
+			draw = mdraw;
+			delay(3);
+		}
+		draw -= 1;
+    }
+
+    // Terminate SPI and GPIO
+
+    spiClose(handle);
+
+    gpioTerminate();
+
+    return 0;
+}
+
+int getValueY()
+{
+    int value;
+    unsigned char buf[3] = { 0x94, 0x00, 0x00 };
+    spiXfer(handle, buf, buf, 3);
+	float mult = 0.015869140625;
+	float mult2 = 1.1733333333333333;
+    value = round(((((buf[1] & 0x7f) << 8) | buf[2]) * mult - 45.0) * mult2);
+    return value;
+}
+
+int getValueX()
+{
+    int value;
+    unsigned char buf[3] = { 0xD4, 0x00, 0x00 };
+    spiXfer(handle, buf, buf, 3);
+	float mult = 0.0244140625;
+	float mult2 = 1.1111111111111112;
+    value = round(800.0 - ((((buf[1] & 0x7f) << 8) | buf[2]) * mult - 40.0) * mult2);
+    return value;
+}

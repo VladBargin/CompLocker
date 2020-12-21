@@ -1,0 +1,175 @@
+#include <pigpio.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/time.h>
+#include <wiringPi.h>
+#include <string.h>
+
+// Add TFTGL library
+#include <tftgl.h>
+
+// Add NANOVG library
+#include <nanovg.h>
+#define NANOVG_GLES2_IMPLEMENTATION	// Use GLES 2 implementation.
+#include <nanovg_gl.h>
+#include <bcm2835.h>
+
+static volatile uint32_t* gpioData = NULL;
+
+#define GPIO_GPFSET0 (BCM2835_GPSET0/4)
+#define GPIO_GPFCLR0 (BCM2835_GPCLR0/4)
+#define GPIO_WRITE_PIN(pinnum, pinstate) \
+	*(gpioData + (pinstate ? GPIO_GPFSET0 : GPIO_GPFCLR0)) = (1 << pinnum);
+
+
+int handle;
+
+void onPressed();
+int getValueX();
+int getValueY();
+int isPressed = 0; // 1 if the touch screen is pressed
+
+void drawBox(struct NVGcontext *vg, int x1, int y1, int x2, int y2, float w) {
+	nvgBeginPath(vg);
+	nvgMoveTo(vg, x1, y1);
+	nvgLineTo(vg, x2, y1);
+	nvgLineTo(vg, x2, y2);
+	nvgLineTo(vg, x1, y2);
+	nvgLineTo(vg, x1, y1);
+	nvgStrokeColor(vg, nvgRGBA(0, 0, 0, 255));
+	nvgStrokeWidth(vg, w);
+	nvgStroke(vg);
+}
+
+void drawRect(struct NVGcontext *vg, int x1, int y1, int x2, int y2, int r, int g, int b, int a) {
+	nvgBeginPath(vg);
+	nvgMoveTo(vg, x1, y1);
+	nvgLineTo(vg, x2, y1);
+	nvgLineTo(vg, x2, y2);
+	nvgLineTo(vg, x1, y2);
+	nvgLineTo(vg, x1, y1);
+	nvgFillColor(vg, nvgRGBA(r, g, b, a));
+	nvgFill(vg);
+}
+
+int dist(int px, int py, int tx, int ty) {
+	return (px - tx) * (px - tx) + (py - ty) * (py - ty);
+}
+
+int main()
+{
+	GLint width, height;
+    int speed = 1000000;
+
+    // GPIO initialization
+    if (gpioInitialise() < 0) {
+        printf("initialize error");
+        exit(1);
+    }
+
+    // SPI initialization
+
+    handle = spiOpen(0, speed, 0);
+    if (handle < 0) {
+        printf("SPI open error");
+    }
+
+	double pxRatio;
+	unsigned int i;
+
+
+	// Initialize tftgl!
+	if(tftglInit(TFTGL_LANDSCAPE) != TFTGL_OK){
+		fprintf(stderr, "Failed to initialize TFTGL library! Error: %s\n",
+			tftglGetErrorStr());
+		return EXIT_FAILURE;
+	}
+
+	// Set brightness to full 100%
+	tftgSetBrightness(255);
+
+	// Get viewport size
+	GLint viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	printf("TFT display initialized with EGL! Screen size: %dx%d\n",
+		viewport[2], viewport[3]);
+
+	width = viewport[2];
+	height = viewport[3];
+
+	glClear(GL_COLOR_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
+
+	struct NVGcontext* vg = nvgCreateGLES2(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
+
+	int px = 2*width, py = 2*height;
+	int mdraw = 13;
+	int draw = mdraw - 1;
+    while (1)
+    {
+		drawRect(vg, 0, 0, width, height, 255, 255, 255, 255);
+        int x = 0, y = 0;
+		int tcnt = 0;
+		for (int i = 0; i < 10; i++) {
+	        int tx = getValueX(), ty = getValueY();
+			if (tx < width && ty < height) {
+				if(px >= width || dist(px, py, tx, ty) < 20000) {
+					tcnt++;
+					x += tx; y += ty;
+				}
+			}
+			delay(1);
+		}
+		if (tcnt > 0) {
+			x /= tcnt;
+			y /= tcnt;
+//			printf("x,%d,", x);
+  //      	printf("y,%d\n", y);
+			drawRect(vg, x - 50, y - 50, x + 50, y + 50, 255, 0, 0, 255);
+			px = x;
+			py = y;
+		} else {
+			px = 2*width;
+			py = 2*height;
+		}
+		if (draw) {
+	//        fflush(stdout);
+			nvgEndFrame(vg);
+			tftglUploadFbo();
+			nvgBeginFrame(vg, width, height, 1.0);
+			draw = mdraw;
+			delay(5);
+		}
+		draw -= 1;
+//		delay(50);
+    }
+
+    // Terminate SPI and GPIO
+
+    spiClose(handle);
+
+    gpioTerminate();
+
+    return 0;
+}
+
+int getValueY()
+{
+    int value;
+    unsigned char buf[3] = { 0x94, 0x00, 0x00 };
+    spiXfer(handle, buf, buf, 3);
+	float mult = 0.015869140625;
+	float mult2 = 1.1733333333333333;
+    value = round(((((buf[1] & 0x7f) << 8) | buf[2]) * mult - 45.0) * mult2);
+    return value;
+}
+
+int getValueX()
+{
+    int value;
+    unsigned char buf[3] = { 0xD4, 0x00, 0x00 };
+    spiXfer(handle, buf, buf, 3);
+	float mult = 0.0244140625;
+	float mult2 = 1.1111111111111112;
+    value = round(800.0 - ((((buf[1] & 0x7f) << 8) | buf[2]) * mult - 40.0) * mult2);
+    return value;
+}
