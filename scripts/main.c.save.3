@@ -4,7 +4,6 @@
 #include <sys/time.h>
 #include <wiringPi.h>
 #include <string.h>
-#include <time.h>
 
 // Add TFTGL library
 #include <tftgl.h>
@@ -42,36 +41,9 @@ struct Text {
 
 	int font, font_size;
 	int x, y, dx, dy;
-	int r, g, b, a;
+	int r, g, b;
 	int hide;
 };
-
-void addString(struct Text * text, char * s) {
-	int i = text->len;
-	while (i < text->max_len && s[i - text->len]) {
-		text->s[i] = s[i - text->len];
-		i++;
-	}
-	text->len = i;
-	text->s[i] = 0;
-}
-
-void clearText(struct Text * text) {
-	text->len = 0;
-	text->s[0] = 0;
-}
-
-// Remove last 'n' letters from 'text->s'
-void removeText(struct Text * text, int n) {
-	while (n-- && text->len > 0) {
-		text->s[text->len - 1] = 0;
-		text->len--;
-	}
-}
-
-void removeChar(struct Text * text) {
-	removeText(text, 1);
-}
 
 struct Box {
 	int x1, y1, x2, y2;
@@ -165,7 +137,7 @@ void addBox(struct Object * object, int x1, int y1, int x2, int y2, int w) {
 	addColorBox(object, x1, y1, x2, y2, 0, 0, 0, 255, w);
 }
 
-struct Text* addColorText(struct Object * object, int x, int y, int dx, int dy, int font, int font_size, int r, int g, int b, int a, int max_len) {
+void addColorText(struct Object * object, int x, int y, int dx, int dy, int font, int font_size, int r, int g, int b) {
 	int cnt_texts = object->cnt_texts;
 	object->texts[cnt_texts].x = x;
 	object->texts[cnt_texts].y = y;
@@ -176,24 +148,17 @@ struct Text* addColorText(struct Object * object, int x, int y, int dx, int dy, 
 	object->texts[cnt_texts].r = r;
 	object->texts[cnt_texts].g = g;
 	object->texts[cnt_texts].b = b;
-	object->texts[cnt_texts].a = a;
 	object->texts[cnt_texts].hide = 0;
-	object->texts[cnt_texts].s = (char *) malloc(sizeof(char) * (max_len + 1));
-	object->texts[cnt_texts].s[0] = 0;
-	object->texts[cnt_texts].max_len = max_len;
-	object->texts[cnt_texts].len = 0;
 	object->cnt_texts++;
-	return &object->texts[cnt_texts];
 }
 
-struct Text* addText(struct Object * object, int x, int y, int dx, int dy, int font, int font_size, int max_len) {
-	return addColorText(object, x, y, dx, dy, font, font_size, 0, 0, 0, 255, max_len);
+void addText(struct Object * object, int x, int y, int dx, int dy, int font, int font_size) {
+	addColorText(object, x, y, dx, dy, font, font_size, 0, 0, 0);
 }
 
 struct Object * objects[MAX_OBJECTS];
 int cnt_objects = 0;
 
-// Also sorts objects by priority in ascending order
 void addObject(struct Object * object, int scene) {
 	object->scene = scene;
 	objects[cnt_objects] = object;
@@ -206,10 +171,6 @@ void addObject(struct Object * object, int scene) {
 		objects[j+1] = temp;
 		j--;
 	}
-}
-
-void addObjectToAll(struct Object * object) {
-	addObject(object, -1);
 }
 
 void drawRect(struct Rect * rect) {
@@ -226,31 +187,17 @@ void drawRect(struct Rect * rect) {
 
 void drawBox(struct Box * box) {
 	if (box->hide) return;
-	nvgBeginPath(vg);
-	nvgMoveTo(vg, box->x1, box->y1);
-	nvgLineTo(vg, box->x2, box->y1);
-	nvgLineTo(vg, box->x2, box->y2);
-	nvgLineTo(vg, box->x1, box->y2);
-	nvgLineTo(vg, box->x1, box->y1);
-	nvgStrokeColor(vg, nvgRGBA(box->r, box->g, box->b, box->a));
-	nvgStrokeWidth(vg, box->w);
-	nvgStroke(vg);
 }
 
 void drawText(struct Text * text) {
 	if (text->hide) return;
-	nvgFontFaceId(vg, text->font);
-	nvgFontSize(vg, text->font_size);
-	nvgFillColor(vg, nvgRGBA(text->r, text->g, text->b, text->a));
-	nvgText(vg, text->x + text->dx, text->y + text->dy, text->s, text->s + text->len);
 }
 
-/*
-Priority:
-1. Rectangles
-2. Boxes
-3. Texts
-*/
+
+// Priority:
+// 1. Rectangles
+// 2. Boxes
+// 3. Texts
 void drawObject(struct Object * object) {
 	if (object->hide) return;
 	for (int i = 0; i < object->cnt_rects; i++) {
@@ -266,142 +213,39 @@ void drawObject(struct Object * object) {
 
 void drawScene() {
 	for (int i = 0; i < cnt_objects; i++) {
-		if (objects[i]->scene == current_scene || objects[i]->scene < 0) {
+		if (objects[i]->scene == current_scene) {
 			drawObject(objects[i]);
 		}
 	}
 }
 
-void touchEvent(struct Object * object, int x, int y);
 
-void registerTouch(int x, int y) {
-	for (int i = 0; i < cnt_objects; i++) {
-		if (isTouched(objects[i], x, y) && (objects[i]->scene == current_scene || objects[i]->scene < 0)) {
-			touchEvent(objects[i], x, y);
-			printf("touched object at index %i,  x = %i, y = %i\n", i, x, y);
-			fflush(stdout);
-			break;
-		}
-	}
-}
-
-
-int current_computer = -1;
-#define NUM_SCENES 5
 /*
-	SCENES:
+EVENTS:
 
-0 - Contains the option(s) to select a computer to take
-1 - Authorisation
-2 - Access granted
-3 - Access denied
-4 - Help!
+0 - change 'current_scene' to 'data'
+1 - c
+2 - 
+
 */
-
-
-// TIME
-struct Object timeTextObj;
-struct Text* timeText;
-
-void updateTime() {
-	time_t rawtime;
-    struct tm * timeinfo;
-
-    time ( &rawtime );
-    timeinfo = localtime ( &rawtime );
-	char * ts = (char *) malloc(sizeof(char) * 6);
-	ts[5] = 0;
-	ts[0] = '0' + timeinfo->tm_hour / 10 % 10;
-	ts[1] = '0' + timeinfo->tm_hour % 10;
-	ts[2] = ':';
-	ts[3] = '0' + timeinfo->tm_min / 10 % 10;
-	ts[4] = '0' + timeinfo->tm_min % 10;
-
-	clearText(timeText);
-	addString(timeText, ts);
-}
-
-void updateTimeTextColor() {
-	int col = 0;
-	if (current_scene == 2 || current_scene == 3) {
-		col = 255;
-	}
-	timeText->r = col;
-	timeText->g = col;
-	timeText->b = col;
-	timeText->a = 255;
-}
-
-void updateColor(struct Object * object, int status) {
-	int r, g, b;
-	r = g = b = 0;
-	if (status == 0) {
-		r = g = b = 127;
-	} else if (status == 1) {
-		r = 200;
-		g = 200;
-	} else if (status == 2) {
-		r = 200;
-	} else if (status == 3) {
-		g = 200;
-	}
-}
-
-// TIME
-
-struct Object backgrounds[NUM_SCENES];
-
-void changeScene(int scene){
-	current_scene = scene;
-	updateTimeTextColor();
-
-	
-
-	printf("scene: %d\n", scene);
-	fflush(stdout);
-}
-
-void touchEvent(struct Object * object, int x, int y) {
+void touchEvent(Object * object, int x, int y) {
 	int _ev = object->touch_event, data = object->data;
 	if (_ev < 0) return;
 
 	if (_ev == 0) {
-		changeScene(data);
+		current_scene = data;
 	} else if (_ev == 1) {
-		return;
+		
 	}
 }
 
-/*
-0 - No computer							(grey)
-1 - No sensor							(yellow)
-2 - Computer not avaliable right now	(red)
-3 - Computer is avaliable				(green)
-*/
-int computerStatus(int id) {
-	return 1;
-}
-
-int correctPassword(int id, char * pswd) {
-	return 1;
-}
-
-// 0 - unsuccessful attempt, 1 - successful attempt
-int logAttempt(int id, char * pswd) {
-	int res = correctPassword(id, pswd);
-
-	/*
-		LOG SOMETHING
-	*/
-	printf("id: %i, res: %i", id, res);
-	return res;
-}
-
-char * idToName(int id) {
-	char * ts = (char *) malloc(sizeof(char) * 2);
-	ts[0] = id % 10 + '0';
-	ts[1] = 0;
-	return ts;
+void registerTouch(int x, int y) {
+	for (int i = 0; i < cnt_objects; i++) {
+		if (isTouched(objects[i], x, y) && objects[i]->scene == current_scene) {
+			printf("touched object at index %i,  x = %i, y = %i\n", i, x, y);
+			fflush(stdout);
+		}
+	}
 }
 
 int main()
@@ -447,70 +291,41 @@ int main()
 	vg = nvgCreateGLES2(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
 	nvgBeginFrame(vg, width, height, 1.0);
 
-
-
 	// Touch and draw variables
 	int px = 2*width, py = 2*height;
-	int mdraw = 4;
+	int mdraw = 1;
 	int draw = mdraw - 1;
 	int cycles_to_next_touch = 4;
 
 	int font = nvgCreateFont(vg, "sans", "FreeSans.ttf");
 
 	// priority = 0, scene = 0
-
-	{
-		defaultObject(&timeTextObj);
-		timeTextObj.priority = 10;
-		timeText = addText(&timeTextObj, width - 95, 35, 0, 0, font, 42, 5);
-		addObjectToAll(&timeTextObj);
-	}
-
-	for (int i = 0; i < NUM_SCENES; i++) {
-		defaultObject(&backgrounds[i]);
-		backgrounds[i].priority = -1;
-		addObject(&backgrounds[i], i);
-	}
-	addColorRect(&backgrounds[0], 0, 0, width, height, 255, 255, 255, 255);
-	addColorRect(&backgrounds[1], 0, 0, width, height, 200, 200, 200, 200);
-	addColorRect(&backgrounds[2], 0, 0, width, height, 0, 64, 0, 255);
-	addColorRect(&backgrounds[3], 0, 0, width, height, 64, 0, 0, 255);
-	addColorRect(&backgrounds[4], 0, 0, width, height, 255, 255, 255, 255);
-
-
-	struct Object a, b, c;
+	struct Object a, b;
 	{
 		defaultObject(&a);
+		a.priority = 1;
 		addObject(&a, 0);
+		addColorRect(&a, 0, 0, width, height, 255, 255, 255, 255);
+		addRect(&a, 100, 100, width - 100, height - 100);
+		addColorRect(&a, 150, 150, width - 150, height - 150, 255, 0, 0, 255);
 		setTouchArea(&a, 0, 0, width, height);
-		a.touch_event = 0;
-		a.data = 1;
 	}
 
 	{
 		defaultObject(&b);
+		b.priority = 0;
 		addObject(&b, 1);
-		setTouchArea(&b, 0, 0, width, height);
-		b.touch_event = 0;
-		b.data = 2;
+		addColorRect(&b, 50, 50, width - 50, height - 50, 0, 255, 0, 255);
 	}
 
-	{
-		defaultObject(&c);
-		addObject(&c, 2);
-		setTouchArea(&c, 0, 0, width, height);
-		c.touch_event = 0;
-		c.data = 0;
-	}
-
-	changeScene(0);
+	current_scene = 0;
 	while (1)
     {
 		// REGISTER TOUCH INPUT
 		{
 	        int x = 0, y = 0;
 			int tcnt = 0;
-			for (int i = 0; i < 15; i++) {
+			for (int i = 0; i < 20; i++) {
 		        int tx = getValueX(), ty = getValueY();
 				if (tx < width && ty < height) {
 					if(px >= width || ((px - tx) * (px - tx) + (py - ty) * (py - ty) < 20000)) {
@@ -549,7 +364,6 @@ int main()
 			tftglUploadFbo();
 			nvgBeginFrame(vg, width, height, 1.0);
 			draw = mdraw;
-			updateTime();
 		}
 		draw -= 1;
     }
