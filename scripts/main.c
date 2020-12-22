@@ -237,12 +237,15 @@ void drawBox(struct Box * box) {
 	nvgStroke(vg);
 }
 
+float bounds[4];
+
 void drawText(struct Text * text) {
 	if (text->hide) return;
 	nvgFontFaceId(vg, text->font);
 	nvgFontSize(vg, text->font_size);
 	nvgFillColor(vg, nvgRGBA(text->r, text->g, text->b, text->a));
-	nvgText(vg, text->x + text->dx, text->y + text->dy, text->s, text->s + text->len);
+	printf("%f\n", nvgText(vg, text->x + text->dx, text->y + text->dy, text->s, text->s + text->len));
+	fflush(stdout);
 }
 
 /*
@@ -275,7 +278,7 @@ void drawScene() {
 void touchEvent(struct Object * object, int x, int y);
 
 void registerTouch(int x, int y) {
-	for (int i = 0; i < cnt_objects; i++) {
+	for (int i = cnt_objects - 1; i >= 0; i--) {
 		if (isTouched(objects[i], x, y) && (objects[i]->scene == current_scene || objects[i]->scene < 0)) {
 			touchEvent(objects[i], x, y);
 			printf("touched object at index %i,  x = %i, y = %i\n", i, x, y);
@@ -286,8 +289,9 @@ void registerTouch(int x, int y) {
 }
 
 
-int current_computer = -1;
+int current_computer = 0;
 #define NUM_SCENES 5
+#define LEN_PASSWD 10
 /*
 	SCENES:
 
@@ -331,6 +335,19 @@ void updateTimeTextColor() {
 	timeText->b = col;
 	timeText->a = 255;
 }
+// TIME
+
+
+
+struct Object backgrounds[NUM_SCENES];
+struct Object bigLogo, smallLogo;
+char passwd[LEN_PASSWD + 1];
+
+#define MAX_COMP 50
+struct Object computerIcon[MAX_COMP];
+
+int computerStatus(int id);
+char * idToName(int id);
 
 void updateColor(struct Object * object, int status) {
 	int r, g, b;
@@ -345,19 +362,32 @@ void updateColor(struct Object * object, int status) {
 	} else if (status == 3) {
 		g = 200;
 	}
+	object->rects[0].r = r;
+	object->rects[0].g = g;
+	object->rects[0].b = b;
 }
 
-// TIME
-
-struct Object backgrounds[NUM_SCENES];
+void updateText(struct Object * object, char * text) {
+	clearText(&(object->texts[0]));
+	addString(&(object->texts[0]), text);
+}
 
 void changeScene(int scene){
 	current_scene = scene;
 	updateTimeTextColor();
 
-	
+	passwd[0] = 0;
 
-	printf("scene: %d\n", scene);
+	int st = computerStatus(current_computer);
+	updateColor(&bigLogo, st);
+	updateColor(&smallLogo, st);
+
+	//char * name = idToName(current_computer);
+	//updateText(&bigLogo, name);
+	//updateText(&smallLogo, name);
+	//free(name);
+
+	printf("scene: %d, c_c: %d\n", scene, current_computer);
 	fflush(stdout);
 }
 
@@ -368,7 +398,8 @@ void touchEvent(struct Object * object, int x, int y) {
 	if (_ev == 0) {
 		changeScene(data);
 	} else if (_ev == 1) {
-		return;
+		current_computer = data;
+		changeScene(1);
 	}
 }
 
@@ -379,7 +410,7 @@ void touchEvent(struct Object * object, int x, int y) {
 3 - Computer is avaliable				(green)
 */
 int computerStatus(int id) {
-	return 1;
+	return id % 4;
 }
 
 int correctPassword(int id, char * pswd) {
@@ -473,34 +504,64 @@ int main()
 	}
 	addColorRect(&backgrounds[0], 0, 0, width, height, 255, 255, 255, 255);
 	addColorRect(&backgrounds[1], 0, 0, width, height, 200, 200, 200, 200);
-	addColorRect(&backgrounds[2], 0, 0, width, height, 0, 64, 0, 255);
-	addColorRect(&backgrounds[3], 0, 0, width, height, 64, 0, 0, 255);
+	addColorRect(&backgrounds[2], 0, 0, width, height, 0, 32, 0, 255);
+	addColorRect(&backgrounds[3], 0, 0, width, height, 32, 0, 0, 255);
 	addColorRect(&backgrounds[4], 0, 0, width, height, 255, 255, 255, 255);
 
-
-	struct Object a, b, c;
 	{
-		defaultObject(&a);
-		addObject(&a, 0);
-		setTouchArea(&a, 0, 0, width, height);
-		a.touch_event = 0;
-		a.data = 1;
+		defaultObject(&bigLogo);
+		bigLogo.priority = 1;
+		addBox(&bigLogo, 30, 50, 400, 420, 2);
+		addRect(&bigLogo, 30, 50, 400, 420);
+		setTouchArea(&bigLogo, 0, 0, width, height);
+		bigLogo.touch_event = 0;
+		bigLogo.data = 2;
+		addObject(&bigLogo, 1);
 	}
 
 	{
-		defaultObject(&b);
-		addObject(&b, 1);
-		setTouchArea(&b, 0, 0, width, height);
-		b.touch_event = 0;
-		b.data = 2;
+		defaultObject(&smallLogo);
+		smallLogo.priority = 1;
+	//	addColorBox(&smallLogo, 300, 140, 500, 340, 255, 255, 255, 255, 2);
+	//	addRect(&smallLogo, 300, 140, 500, 340);
+		int d = 55;
+		int x1 = width/2 - d, y1 = height/2 - d, x2 = width/2 + d, y2 = height/2 + d;
+		addColorBox(&smallLogo, x1, y1, x2, y2, 255, 255, 255, 255, 2);
+		addRect(&smallLogo, x1, y1, x2, y2);
+		setTouchArea(&smallLogo, x1, y1, x2, y2);
+		smallLogo.touch_event = 0;
+		smallLogo.data = 0;
+		addObject(&smallLogo, 2);
 	}
 
 	{
-		defaultObject(&c);
-		addObject(&c, 2);
-		setTouchArea(&c, 0, 0, width, height);
-		c.touch_event = 0;
-		c.data = 0;
+		int cw = 7, ch = 4;
+		int d = 100;
+		int tw = width / cw, th = height / ch;
+		int dx = (tw - d) / 2;
+		int dy = (th - d) / 2;
+		if (dy < dx) dx = dy;
+		int ti = 0;
+		for (int i = 0; i < ch; i++) {
+			for (int j = 0; j < cw; j++) {
+				if (i == 0 && j == cw - 1) continue;
+				defaultObject(&computerIcon[ti]);
+				computerIcon[ti].priority = 1;
+				computerIcon[ti].data = ti;
+				computerIcon[ti].touch_event = 1;
+				int x1, y1, x2, y2;
+				x1 = j * width / cw;
+				y1 = i * height / ch;
+				x2 = (j + 1) * width / cw;
+				y2 = (i + 1) * height / ch;
+				setTouchArea(&computerIcon[ti], x1, y1, x2, y2);
+				addRect(&computerIcon[ti], x1 + dx, y1 + dx, x2 - dx, y2 - dx);
+				addBox(&computerIcon[ti], x1 + dx, y1 + dx, x2 - dx, y2 - dx, 2);
+				updateColor(&computerIcon[ti], computerStatus(ti));
+				addObject(&computerIcon[ti], 0);
+				ti++;
+			}
+		}
 	}
 
 	changeScene(0);
