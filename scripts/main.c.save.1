@@ -44,26 +44,16 @@ struct Text {
 	int x, y, dx, dy;
 	int r, g, b, a;
 	int hide;
-	int pswd;
 };
 
 void addString(struct Text * text, char * s) {
 	int i = text->len;
 	while (i < text->max_len && s[i - text->len]) {
-		if (text->pswd) text->s[i] = '*';
-		else text->s[i] = s[i - text->len];
+		text->s[i] = s[i - text->len];
 		i++;
 	}
 	text->len = i;
 	text->s[i] = 0;
-}
-
-void addChar(struct Text * text, char c) {
-	if (text->len == text->max_len) return;
-	if (text->pswd) text->s[text->len] = '*';
-	else text->s[text->len] = c;
-	text->len++;
-	text->s[text->len] = 0;
 }
 
 void clearText(struct Text * text) {
@@ -175,7 +165,7 @@ void addBox(struct Object * object, int x1, int y1, int x2, int y2, int w) {
 	addColorBox(object, x1, y1, x2, y2, 0, 0, 0, 255, w);
 }
 
-struct Text* addColorText(struct Object * object, int x, int dx, int y, int dy, int font, int font_size, int r, int g, int b, int a, int max_len) {
+struct Text* addColorText(struct Object * object, int x, int y, int dx, int dy, int font, int font_size, int r, int g, int b, int a, int max_len) {
 	int cnt_texts = object->cnt_texts;
 	object->texts[cnt_texts].x = x;
 	object->texts[cnt_texts].y = y;
@@ -192,13 +182,12 @@ struct Text* addColorText(struct Object * object, int x, int dx, int y, int dy, 
 	object->texts[cnt_texts].s[0] = 0;
 	object->texts[cnt_texts].max_len = max_len;
 	object->texts[cnt_texts].len = 0;
-	object->texts[cnt_texts].pswd = 0;
 	object->cnt_texts++;
 	return &object->texts[cnt_texts];
 }
 
-struct Text* addText(struct Object * object, int x, int dx, int y, int dy, int font, int font_size, int max_len) {
-	return addColorText(object, x, dx, y, dy, font, font_size, 0, 0, 0, 255, max_len);
+struct Text* addText(struct Object * object, int x, int y, int dx, int dy, int font, int font_size, int max_len) {
+	return addColorText(object, x, y, dx, dy, font, font_size, 0, 0, 0, 255, max_len);
 }
 
 struct Object * objects[MAX_OBJECTS];
@@ -248,8 +237,6 @@ void drawBox(struct Box * box) {
 	nvgStroke(vg);
 }
 
-float bounds[4];
-
 void drawText(struct Text * text) {
 	if (text->hide) return;
 	nvgFontFaceId(vg, text->font);
@@ -288,7 +275,7 @@ void drawScene() {
 void touchEvent(struct Object * object, int x, int y);
 
 void registerTouch(int x, int y) {
-	for (int i = cnt_objects - 1; i >= 0; i--) {
+	for (int i = 0; i < cnt_objects; i++) {
 		if (isTouched(objects[i], x, y) && (objects[i]->scene == current_scene || objects[i]->scene < 0)) {
 			touchEvent(objects[i], x, y);
 			printf("touched object at index %i,  x = %i, y = %i\n", i, x, y);
@@ -301,6 +288,7 @@ void registerTouch(int x, int y) {
 
 int current_computer = 0;
 #define NUM_SCENES 5
+#define LEN_PASSWD 10
 /*
 	SCENES:
 
@@ -334,7 +322,7 @@ void updateTime() {
 	addString(timeText, ts);
 }
 
-void updateTimeTextColorAndPos() {
+void updateTimeTextColor() {
 	int col = 0;
 	if (current_scene == 2 || current_scene == 3) {
 		col = 255;
@@ -343,10 +331,6 @@ void updateTimeTextColorAndPos() {
 	timeText->g = col;
 	timeText->b = col;
 	timeText->a = 255;
-
-////	if (current_scene == 0) {
-	//			timeTextObj = addText(&timeTextObj, width - 100, 35, 0, 0, font, 32, 5);
-	//}
 }
 // TIME
 
@@ -354,23 +338,13 @@ void updateTimeTextColorAndPos() {
 
 struct Object backgrounds[NUM_SCENES];
 struct Object bigLogo, smallLogo;
-struct Object passwdText;
-
-#define LEN_PASSWD 6
 char passwd[LEN_PASSWD + 1];
 
 #define MAX_COMP 50
 struct Object computerIcon[MAX_COMP];
 
-#define MAX_BUTTONS 20
-struct Object buttons[MAX_BUTTONS];
-
-struct Object backButton[NUM_SCENES];
-
 int computerStatus(int id);
 char * idToName(int id);
-int logAttempt(int id, char * pswd);
-
 
 void updateColor(struct Object * object, int status) {
 	int r, g, b;
@@ -378,73 +352,42 @@ void updateColor(struct Object * object, int status) {
 	if (status == 0) {
 		r = g = b = 127;
 	} else if (status == 1) {
-		r = 240;
-		g = 240;
+		r = 200;
+		g = 200;
 	} else if (status == 2) {
-		r = 240;
+		r = 200;
 	} else if (status == 3) {
-		g = 240;
+		g = 200;
 	}
+	printf("%i, stat: %i\n", object->cnt_rects, status);
+	fflush(stdout);
 	object->rects[0].r = r;
 	object->rects[0].g = g;
 	object->rects[0].b = b;
 }
 
-void updateText(struct Object * object, int id) {
-	char * text = idToName(id);
+void updateText(struct Object * object, char * text) {
 	clearText(&(object->texts[0]));
 	addString(&(object->texts[0]), text);
-	printf("id: %i, s: %s, s2: %s\n", id, text, object->texts[0].s);
-	fflush(stdout);
-	free(text);
 }
 
 void changeScene(int scene){
 	current_scene = scene;
-	updateTimeTextColorAndPos();
+	updateTimeTextColor();
 
 	passwd[0] = 0;
-	clearText(&(passwdText.texts[0]));
 
 	int st = computerStatus(current_computer);
 	updateColor(&bigLogo, st);
 	updateColor(&smallLogo, st);
 
-	updateText(&bigLogo, current_computer);
-	updateText(&smallLogo, current_computer);
+	//char * name = idToName(current_computer);
+	//updateText(&bigLogo, name);
+	//updateText(&smallLogo, name);
+	//free(name);
 
-	if (scene == 0) {
-		timeText->dx = -124;
-		timeText->dy = 89;
-	} else {
-		timeText->dx = -95;
-		timeText->dy = 55;
-	}
-
-	printf("scene: %d, c_c: %d\n", scene, current_computer);
+	printf("scene: %d\n", scene);
 	fflush(stdout);
-}
-
-void addCharP(char c) {
-	addChar(&(passwdText.texts[0]), c);
-	int i = 0;
-	while (i < LEN_PASSWD) {
-		if (passwd[i] == 0) {
-			passwd[i] = c;
-			passwd[i + 1] = 0;
-			break;
-		}
-		i++;
-	}
-}
-
-void remCharP() {
-	removeText(&(passwdText.texts[0]), 1);
-	int i = 0;
-	while (i < LEN_PASSWD) {
-		if (passwd[i]) passwd[i] = 0;
-		i++;
-	}
 }
 
 void touchEvent(struct Object * object, int x, int y) {
@@ -454,21 +397,7 @@ void touchEvent(struct Object * object, int x, int y) {
 	if (_ev == 0) {
 		changeScene(data);
 	} else if (_ev == 1) {
-		current_computer = data;
-		changeScene(1);
-	} else if (_ev == 2) {
-		if (computerStatus(current_computer)) addCharP(data);
-	} else if (_ev == 3) {
-		remCharP();
-	} else if (_ev == 4) {
-		if (computerStatus(current_computer)) {
-			int res = logAttempt(current_computer, passwd);
-			if (res) {
-				changeScene(2);
-			} else {
-				changeScene(3);
-			}
-		}
+		return;
 	}
 }
 
@@ -479,8 +408,7 @@ void touchEvent(struct Object * object, int x, int y) {
 3 - Computer is avaliable				(green)
 */
 int computerStatus(int id) {
-	if (id < 2) return 1;
-	return 0;
+	return 2;
 }
 
 int correctPassword(int id, char * pswd) {
@@ -494,16 +422,14 @@ int logAttempt(int id, char * pswd) {
 	/*
 		LOG SOMETHING
 	*/
-
 	printf("id: %i, res: %i", id, res);
 	return res;
 }
 
 char * idToName(int id) {
-	char * ts = (char *) malloc(sizeof(char) * 3);
-	ts[0] = id / 10 % 10 + '0';
-	ts[1] = id % 10 + '0';
-	ts[2] = 0;
+	char * ts = (char *) malloc(sizeof(char) * 2);
+	ts[0] = id % 10 + '0';
+	ts[1] = 0;
 	return ts;
 }
 
@@ -558,10 +484,16 @@ int main()
 	int draw = mdraw - 1;
 	int cycles_to_next_touch = 4;
 
-	int font = nvgCreateFont(vg, "sans", "CourierNewBd.ttf");
+	int font = nvgCreateFont(vg, "sans", "FreeSans.ttf");
 
 	// priority = 0, scene = 0
 
+	{
+		defaultObject(&timeTextObj);
+		timeTextObj.priority = 10;
+		timeText = addText(&timeTextObj, width - 95, 35, 0, 0, font, 42, 5);
+		addObjectToAll(&timeTextObj);
+	}
 
 	for (int i = 0; i < NUM_SCENES; i++) {
 		defaultObject(&backgrounds[i]);
@@ -569,43 +501,55 @@ int main()
 		addObject(&backgrounds[i], i);
 	}
 	addColorRect(&backgrounds[0], 0, 0, width, height, 255, 255, 255, 255);
-	addColorRect(&backgrounds[1], 0, 0, width, height, 255, 255, 255, 255);
+	addColorRect(&backgrounds[1], 0, 0, width, height, 200, 200, 200, 200);
 	addColorRect(&backgrounds[2], 0, 0, width, height, 0, 32, 0, 255);
-	addColorRect(&backgrounds[3], 0, 0, width, height, 64, 0, 0, 255);
+	addColorRect(&backgrounds[3], 0, 0, width, height, 32, 0, 0, 255);
 	addColorRect(&backgrounds[4], 0, 0, width, height, 255, 255, 255, 255);
+
+	struct Object a;
+	{
+		defaultObject(&a);
+		addObject(&a, 0);
+		setTouchArea(&a, 0, 0, width, height);
+		a.touch_event = 0;
+		a.data = 1;
+	}
 
 	{
 		defaultObject(&bigLogo);
 		bigLogo.priority = 1;
-		addBox(&bigLogo, 10, 90, 370, 450, 2);
-		addRect(&bigLogo, 10, 90, 370, 450);
-		addText(&bigLogo, 190, -52, 270, 24, font, 100, 3);
+		addBox(&bigLogo, 30, 50, 400, 420, 2);
+		addRect(&bigLogo, 30, 50, 400, 420);
+		setTouchArea(&bigLogo, 0, 0, width, height);
+		bigLogo.touch_event = 0;
+		bigLogo.data = 2;
 		addObject(&bigLogo, 1);
 	}
 
-	int d = 150;
 	{
 		defaultObject(&smallLogo);
 		smallLogo.priority = 1;
 	//	addColorBox(&smallLogo, 300, 140, 500, 340, 255, 255, 255, 255, 2);
 	//	addRect(&smallLogo, 300, 140, 500, 340);
-		int x1 = width/2 - d/2, y1 = height/2 - d/2, x2 = width/2 + d/2, y2 = height/2 + d/2;
+		int d = 55;
+		int x1 = width/2 - d, y1 = height/2 - d, x2 = width/2 + d, y2 = height/2 + d;
 		addColorBox(&smallLogo, x1, y1, x2, y2, 255, 255, 255, 255, 2);
 		addRect(&smallLogo, x1, y1, x2, y2);
-		addText(&smallLogo, 400, -26, 240, 13, font, 50, 3);
+		setTouchArea(&smallLogo, x1, y1, x2, y2);
+		smallLogo.touch_event = 0;
+		smallLogo.data = 0;
 		addObject(&smallLogo, 2);
 	}
 
 	{
-		int cw = 5, ch = 3;
+		int cw = 6, ch = 4;
+		int d = 110;
 		int tw = width / cw, th = height / ch;
 		int dx = (tw - d) / 2;
 		int dy = (th - d) / 2;
-		if (dy < dx) dx = dy;
-		int ti = 0;
 		for (int i = 0; i < ch; i++) {
 			for (int j = 0; j < cw; j++) {
-				if (i == 0 && j == cw - 1) continue;
+				int ti = i * cw + j;
 				defaultObject(&computerIcon[ti]);
 				computerIcon[ti].priority = 1;
 				computerIcon[ti].data = ti;
@@ -616,92 +560,15 @@ int main()
 				x2 = (j + 1) * width / cw;
 				y2 = (i + 1) * height / ch;
 				setTouchArea(&computerIcon[ti], x1, y1, x2, y2);
-				addRect(&computerIcon[ti], x1 + dx, y1 + dx, x2 - dx, y2 - dx);
-				addBox(&computerIcon[ti], x1 + dx, y1 + dx, x2 - dx, y2 - dx, 2);
-				addText(&computerIcon[ti], x1 + tw / 2, -26, y1 + th / 2, 13, font, 50, 5);
+				addRect(&computerIcon[ti], x1 + dx, y1 + dy, x2 - dx, y2 - dy);				addRect(&computerIcon[ti], x1 + dx, y1 + dy, x2 - dx, y2 - dy);
+
 				updateColor(&computerIcon[ti], computerStatus(ti));
-				updateText(&computerIcon[ti], ti);
 				addObject(&computerIcon[ti], 0);
-				ti++;
 			}
 		}
-		{
-			defaultObject(&timeTextObj);
-			timeTextObj.priority = 10;
-			timeText = addText(&timeTextObj, width, -115, 0, 40, font, 32, 5);
-			addObjectToAll(&timeTextObj);
-		}
-
-		{
-			d = 80;
-			int x1 = 385, y1 = 180, x2 = width - 5, y2 = height - 25;
-			int cw = 4, ch = 3;
-			int ti = 0;
-			int tw = (x2 - x1) / cw;
-			int th = (y2 - y1) / ch;
-			int dx = (tw - d) / 2;
-			int dy = (th - d) / 2;
-			if (dy < dx) dx = dy;
-			for (int i = 0; i < ch; i++) {
-				for (int j = 0; j < cw; j++) {
-					defaultObject(&buttons[ti]);
-					buttons[ti].priority = 1;
-					buttons[ti].data = ti;
-					buttons[ti].touch_event = 2;
-					int tx1, tx2, ty1, ty2;
-					tx1 = j * (x2 - x1) / cw + x1;
-					tx2 = (j + 1) * (x2 - x1) / cw + x1;
-					ty1 = i * (y2 - y1) / ch + y1;
-					ty2 = (i + 1) * (y2 - y1) / ch + y1;
-					setTouchArea(&buttons[ti], tx1, ty1, tx2, ty2);
-					addColorRect(&buttons[ti], tx1 + dx, ty1 + dy, tx2 - dx, ty2 - dy, 0, 128, 255, 255);
-					addBox(&buttons[ti], tx1 + dx, ty1 + dy, tx2 - dx, ty2 - dy, 2);
-					struct Text * tp = addText(&buttons[ti], tx1 + tw / 2, -13, ty1 + th / 2, 13, font, 50, 1);
-					buttons[ti].touch_event = 2;
-					char bChar = ti + '0';
-					if (ti == 10) {
-						buttons[ti].touch_event = 3;
-						bChar = '<';
-					} else if (ti == 11) {
-						buttons[ti].touch_event = 4;
-						bChar = '>';
-					} else {
-						buttons[ti].data = bChar;
-					}
-					addChar(tp, bChar);
-					addObject(&buttons[ti], 1);
-					ti++;
-				}
-			}
-
-			{
-				defaultObject(&passwdText);
-				addBox(&passwdText, 390, 90, width - 10, 175, 2);
-				addObject(&passwdText, 1);
-				addText(&passwdText, 390, 35 - 13, 132, 17, font, 50, LEN_PASSWD);
-			}
-		}
-	}
-
-	{
-		for (int i = 0; i < NUM_SCENES; i++) {
-			defaultObject(&backButton[i]);
-			addBox(&backButton[i], 10, 10, 80, 80, 2);
-			struct Text * tmp = addText(&backButton[i], 45, -13, 45, 13, font, 50, 1);
-			addChar(tmp, '<');
-			backButton[i].priority = 2;
-			backButton[i].touch_event = 0;
-			backButton[i].data = 0;
-			setTouchArea(&backButton[i], 10, 10, 80, 80);
-		}
-		addObject(&backButton[1], 1);
-		addObject(&backButton[2], 2);
-		addObject(&backButton[3], 3);
-		backButton[3].data = 1;
 	}
 
 	changeScene(0);
-	passwdText.texts[0].pswd = 1;
 	while (1)
     {
 		// REGISTER TOUCH INPUT
@@ -740,9 +607,8 @@ int main()
 
 
 
+		drawScene();
 		// Draw frame every 'mdraw' cycles of this loop. The neccesay delay is provided by reading the touch input data
-			drawScene();
-
 		if (draw == 0) {
 			nvgEndFrame(vg);
 			tftglUploadFbo();
