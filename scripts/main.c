@@ -416,10 +416,14 @@ void changeScene(int scene){
 	if (scene == 0) {
 		timeText->dx = -124;
 		timeText->dy = 89;
-	} else {
+	} else if (scene == 1) {
 		timeText->dx = -95;
 		timeText->dy = 55;
+	} else {
+		timeText->dx = -95;
+		timeText->dy = 35;
 	}
+
 
 	printf("scene: %d, c_c: %d\n", scene, current_computer);
 	fflush(stdout);
@@ -480,17 +484,28 @@ void touchEvent(struct Object * object, int x, int y) {
 */
 int computerStatus(int id) {
 	if (id < 2) return 1;
+	if (id == 9) return 2;
+	if (id == 8) return 3;
 	return 0;
 }
 
 int correctPassword(int id, char * pswd) {
-	return 1;
+	return (id == 0) || (id == 9);
 }
 
 // 0 - unsuccessful attempt, 1 - successful attempt
 int logAttempt(int id, char * pswd) {
 	int res = correctPassword(id, pswd);
 
+	/*
+		LOG SOMETHING
+	*/
+
+//	int pid = fork();
+//	if (pid == 0) {
+		system("bash /home/pi/Documents/CompLocker/scripts/cam.sh");
+//		exit(0);
+//	}
 	/*
 		LOG SOMETHING
 	*/
@@ -505,6 +520,15 @@ char * idToName(int id) {
 	ts[1] = id % 10 + '0';
 	ts[2] = 0;
 	return ts;
+}
+
+int abs(int a) {
+	if (a >= 0) return a;
+	return -a;
+}
+
+int dist(int x1, int y1, int x2, int y2) {
+	return abs(x1 - x2) + abs(y1 - y2);
 }
 
 int main()
@@ -554,7 +578,7 @@ int main()
 
 	// Touch and draw variables
 	int px = 2*width, py = 2*height;
-	int mdraw = 4;
+	int mdraw = 60;
 	int draw = mdraw - 1;
 	int cycles_to_next_touch = 4;
 
@@ -577,9 +601,9 @@ int main()
 	{
 		defaultObject(&bigLogo);
 		bigLogo.priority = 1;
-		addBox(&bigLogo, 10, 90, 370, 450, 2);
-		addRect(&bigLogo, 10, 90, 370, 450);
-		addText(&bigLogo, 190, -52, 270, 24, font, 100, 3);
+		addBox(&bigLogo, 10, 90, 370, 470, 2);
+		addRect(&bigLogo, 10, 90, 370, 470);
+		addText(&bigLogo, 200, -52, 278, 24, font, 100, 3);
 		addObject(&bigLogo, 1);
 	}
 
@@ -632,9 +656,10 @@ int main()
 			addObjectToAll(&timeTextObj);
 		}
 
+
 		{
-			d = 80;
-			int x1 = 385, y1 = 180, x2 = width - 5, y2 = height - 25;
+			d = 82;
+			int x1 = 385, y1 = 180, x2 = width - 5, y2 = height - 5;
 			int cw = 4, ch = 3;
 			int ti = 0;
 			int tw = (x2 - x1) / cw;
@@ -701,49 +726,72 @@ int main()
 	}
 
 	changeScene(0);
-	passwdText.texts[0].pswd = 1;
+	passwdText.texts[0].pswd = 0;
+
+#define CNT_READS 20
+	int touchData[CNT_READS][2];
+
+	for (int i = 0; i < CNT_READS; i++) touchData[i][0] = touchData[i][1] = width;
+
+	struct Object tmp;
+	defaultObject(&tmp);
+	addColorBox(&tmp, 0, 0, 1, 1, 255, 0, 0, 128, 10);
+	tmp.priority = 20;
+	addObjectToAll(&tmp);
+
 	while (1)
     {
 		// REGISTER TOUCH INPUT
 		{
-	        int x = 0, y = 0;
-			int tcnt = 0;
-			for (int i = 0; i < 15; i++) {
-		        int tx = getValueX(), ty = getValueY();
-				if (tx < width && ty < height) {
-					if(px >= width || ((px - tx) * (px - tx) + (py - ty) * (py - ty) < 20000)) {
-						tcnt++;
-						x += tx; y += ty;
+			for (int i = CNT_READS - 1; i > 0; i--) {
+				touchData[i][0] = touchData[i - 1][0];
+				touchData[i][1] = touchData[i - 1][1];
+			}
+			touchData[0][0] = getValueX();
+			touchData[0][1] = getValueY();
+			int g = 1;
+
+#define MANXATAN_SPREAD 200
+			for (int i = 0; i < CNT_READS; i++) {
+				if (touchData[i][0] >= width) g = 0;
+				if (!g) break;
+				for (int j = i + 1; j < CNT_READS; j++) {
+					if (dist(touchData[i][0], touchData[i][1], touchData[j][0], touchData[j][1]) > MANXATAN_SPREAD) {
+						g = 0;
+						break;
 					}
 				}
-				delay(1);
 			}
-			if (tcnt > 0) {
-				x /= tcnt;
-				y /= tcnt;
-				px = x;
-				py = y;
+
+			if (g) {
+				int x = 0, y = 0;
+				for (int i = 0; i < CNT_READS; i++) {
+					x += touchData[i][0];
+					y += touchData[i][1];
+				}
+				x /= CNT_READS;
+				y /= CNT_READS;
 				if (touch_down == 0) {
+					tmp.boxes[0].x1 = x - 50;
+					tmp.boxes[0].x2 = x + 50;
+					tmp.boxes[0].y1 = y - 50;
+					tmp.boxes[0].y2 = y + 50;
 					registerTouch(x, y);
 				}
 				touch_down = cycles_to_next_touch - 1;
 			} else {
-				px = 2*width;
-				py = 2*height;
 				if (touch_down > 0) {
 					touch_down--;
 				}
 			}
+			delay(1);
 		}
 		// REGISTER TOUCH INPUT
 
 
-
-
 		// Draw frame every 'mdraw' cycles of this loop. The neccesay delay is provided by reading the touch input data
-			drawScene();
-
 		if (draw == 0) {
+			drawScene();
 			nvgEndFrame(vg);
 			tftglUploadFbo();
 			nvgBeginFrame(vg, width, height, 1.0);
