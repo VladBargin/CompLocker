@@ -1,0 +1,128 @@
+pi@raspberrypi:~/Documents/CompLocker/scripts $ sudo ./main
+TFT display initialized with EGL! Screen size: 800x480
+id: 0, s: 00, s2: 00
+id: 1, s: 01, s2: 01
+id: 2, s: 02, s2: 02
+id: 3, s: 03, s2: 03
+id: 4, s: 04, s2: 04
+id: 5, s: 05, s2: 05
+id: 6, s: 06, s2: 06
+id: 7, s: 07, s2: 07
+id: 8, s: 08, s2: 08
+id: 9, s: 09, s2: 09
+id: 10, s: 10, s2: 10
+id: 11, s: 11, s2: 11
+id: 12, s: 12, s2: 12
+id: 13, s: 13, s2: 13
+id: 0, s: 00, s2: 00
+id: 0, s: 00, s2: 00
+scene: 0, c_c: 0
+id: 2, s: 02, s2: 02
+id: 2, s: 02, s2: 02
+scene: 1, c_c: 2
+touched object at index 10,  x = 431, y = 84
+touched object at index 22,  x = 470, y = 239
+touched object at index 22,  x = 450, y = 223
+touched object at index 23,  x = 558, y = 265
+touched object at index 27,  x = 544, y = 288
+touched object at index 31,  x = 487, y = 408
+touched object at index 31,  x = 502, y = 393
+touched object at index 28,  x = 628, y = 371
+touched object at index 28,  x = 606, y = 278
+touched object at index 29,  x = 773, y = 331
+touched object at index 28,  x = 608, y = 300
+touched object at index 23,  x = 554, y = 248
+touched object at index 22,  x = 485, y = 253
+touched object at index 23,  x = 537, y = 209
+id: 2, s: 02, s2: 02
+id: 2, s: 02, s2: 02
+scene: 0, c_c: 2
+touched object at index 34,  x = 69, y = 59
+id: 0, s: 00, s2: 00
+id: 0, s: 00, s2: 00
+scene: 1, c_c: 0
+touched object at index 8,  x = 79, y = 88
+touched object at index 24,  x = 616, y = 251
+touched object at index 25,  x = 745, y = 258
+touched object at index 22,  x = 458, y = 228
+touched object at index 23,  x = 538, y = 229
+touched object at index 30,  x = 465, y = 438
+touched object at index 32,  x = 632, y = 443
+touched object at index 32,  x = 625, y = 431
+touched object at index 27,  x = 529, y = 360
+touched object at index 27,  x = 561, y = 362
+touched object at index 27,  x = 539, y = 359
+touched object at index 27,  x = 530, y = 369
+id: 0, res: 1id: 0, s: 00, s2: 00
+id: 0, s: 00, s2: 00
+scene: 2, c_c: 0
+touched object at index 33,  x = 737, y = 424
+id: 0, s: 00, s2: 00
+id: 0, s: 00, s2: 00
+scene: 0, c_c: 0
+touched object at index 35,  x = 67, y = 57
+id: 2, s: 02, s2: 02
+id: 2, s: 02, s2: 02
+scene: 1, c_c: 2
+touched object at index 10,  x = 321, y = 126
+id: 2, s: 02, s2: 02
+id: 2, s: 02, s2: 02
+scene: 0, c_c: 2
+touched object at index 34,  x = 75, y = 59
+id: 1, s: 01, s2: 01
+id: 1, s: 01, s2: 01
+scene: 1, c_c: 1
+touched object at index 9,  x = 242, y = 76
+touched object at index 22,  x = 458, y = 251
+touched object at index 23,  x = 549, y = 249
+touched object at index 24,  x = 621, y = 250
+touched object at index 25,  x = 754, y = 243
+touched object at index 31,  x = 531, y = 453
+id: 1, res: 0id: 1, s: 01, s2: 01
+id: 1, s: 01, s2: 01
+scene: 3, c_c: 1
+touched object at index 33,  x = 744, y = 456
+id: 1, s: 01, s2: 01
+id: 1, s: 01, s2: 01
+scene: 1, c_c: 1
+touched object at index 36,  x = 79, y = 67
+id: 1, s: 01, s2: 01
+id: 1, s: 01, s2: 01
+scene: 0, c_c: 1
+touched object at index 34,  x = 62, y = 60
+id: 8, s: 08, s2: 08
+id: 8, s: 08, s2: 08
+scene: 1, c_c: 8
+touched object at index 16,  x = 744, y = 258
+touched object at index 22,  x = 457, y = 236
+touched object at index 23,  x = 559, y = 258
+touched object at index 24,  x = 633, y = 257
+id: 8, res: 0id: 8, s: 08, s2: 08
+id: 8, s: 08, s2: 08
+scene: 3, c_c: 8
+touched object at index 33,  x = 740, y = 442
+id: 8, s: 08, s2: 08
+id: 8, s: 08, s2: 08
+scene: 1, c_c: 8
+touched object at index 36,  x = 75, y = 60
+id: 8, s: 08, s2: 08
+id: 8, s: 08, s2: 08
+scene: 0, c_c: 8
+touched object at index 34,  x = 50, y = 49
+id: 9, s: 09, s2: 09
+id: 9, s: 09, s2: 09
+scene: 1, c_c: 9
+touched object at index 17,  x = 100, y = 384
+touched object at index 23,  x = 556, y = 248
+touched object at index 24,  x = 630, y = 242
+touched object at index 31,  x = 555, y = 451
+touched object at index 32,  x = 666, y = 450
+touched object at index 26,  x = 444, y = 351
+id: 9, res: 1id: 9, s: 09, s2: 09
+id: 9, s: 09, s2: 09
+scene: 2, c_c: 9
+touched object at index 33,  x = 748, y = 449
+id: 9, s: 09, s2: 09
+id: 9, s: 09, s2: 09
+scene: 0, c_c: 9
+touched object at index 35,  x = 77, y = 73
