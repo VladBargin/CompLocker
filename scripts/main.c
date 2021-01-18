@@ -248,8 +248,6 @@ void drawBox(struct Box * box) {
 	nvgStroke(vg);
 }
 
-float bounds[4];
-
 void drawText(struct Text * text) {
 	if (text->hide) return;
 	nvgFontFaceId(vg, text->font);
@@ -354,12 +352,12 @@ void updateTimeTextColorAndPos() {
 
 struct Object backgrounds[NUM_SCENES];
 struct Object bigLogo, smallLogo;
-struct Object passwdText;
+struct Object passwdText, buttonL, buttonR;
 
 #define LEN_PASSWD 6
 char passwd[LEN_PASSWD + 1];
 
-#define MAX_COMP 50
+#define MAX_COMP 40
 struct Object computerIcon[MAX_COMP];
 
 #define MAX_BUTTONS 20
@@ -368,6 +366,7 @@ struct Object buttons[MAX_BUTTONS];
 struct Object backButton[NUM_SCENES];
 
 int computerStatus(int id);
+void updateStatus(int i);
 char * idToName(int id);
 int logAttempt(int id, char * pswd);
 
@@ -400,6 +399,10 @@ void updateText(struct Object * object, int id) {
 }
 
 void changeScene(int scene){
+	if ((current_scene == 0 && scene == 1) || (current_scene == 2 && scene == 0)) {
+		updateStatus(current_computer);
+	}
+
 	current_scene = scene;
 	updateTimeTextColorAndPos();
 
@@ -451,6 +454,9 @@ void remCharP() {
 	}
 }
 
+int current_page = 0;
+int cnt_w = 4, cnt_h = 3;
+
 void touchEvent(struct Object * object, int x, int y) {
 	int _ev = object->touch_event, data = object->data;
 	if (_ev < 0) return;
@@ -473,8 +479,39 @@ void touchEvent(struct Object * object, int x, int y) {
 				changeScene(3);
 			}
 		}
+	} else if (_ev == 5) {
+		if (current_page <= 0) return;
+		int i2 = cnt_w * cnt_h * (current_page + 1);
+		if (current_page == 3) i2 = cnt_w * cnt_h * current_page + 1;
+		for (int i = cnt_w * cnt_h * current_page; i < i2; i++) {
+			computerIcon[i].hide = 1;
+			computerIcon[i].can_touch = 0;
+		}
+		current_page--;
+		for (int i = cnt_w * cnt_h * current_page; i < cnt_w*cnt_h * (current_page + 1); i++) {
+			computerIcon[i].hide = 0;
+			computerIcon[i].can_touch = 1;
+		}
+	} else if (_ev == 6) {
+		if (current_page >= 3) return;
+		for (int i = cnt_w * cnt_h * current_page; i < cnt_w*cnt_h * (current_page + 1); i++) {
+			computerIcon[i].hide = 1;
+			computerIcon[i].can_touch = 0;
+		}
+		current_page++;
+		int i2 = cnt_w * cnt_h * (current_page + 1);
+		if (current_page == 3) i2 = cnt_w * cnt_h * current_page + 1;
+
+		for (int i = cnt_w * cnt_h * current_page; i < i2; i++) {
+			computerIcon[i].hide = 0;
+			computerIcon[i].can_touch = 1;
+		}
 	}
 }
+
+char command[100];
+
+int c_status[MAX_COMP];
 
 /*
 0 - No computer							(grey)
@@ -483,14 +520,23 @@ void touchEvent(struct Object * object, int x, int y) {
 3 - Computer is avaliable				(green)
 */
 int computerStatus(int id) {
-	if (id < 2) return 1;
-	if (id == 9) return 2;
-	if (id == 8) return 3;
-	return 0;
+	return c_status[id];
 }
 
+void updateStatus(int i) {
+	sprintf(command, "python status.py %i", i);
+	int res = system(command);
+	c_status[i] = WEXITSTATUS(res);
+}
+
+
+
 int correctPassword(int id, char * pswd) {
-	return (id == 0) || (id == 9);
+	sprintf(command, "python check.py %i %s", id, pswd);
+	int res = WEXITSTATUS(system(command));
+	printf("PSWD RES: %i    pswd: |%s|  %s\n", res, pswd, command);
+	fflush(stdout);
+	return res;
 }
 
 // 0 - unsuccessful attempt, 1 - successful attempt
@@ -501,11 +547,8 @@ int logAttempt(int id, char * pswd) {
 		LOG SOMETHING
 	*/
 
-//	int pid = fork();
-//	if (pid == 0) {
-		system("bash /home/pi/Documents/CompLocker/scripts/cam.sh");
-//		exit(0);
-//	}
+	system("bash /home/pi/Documents/CompLocker/scripts/cam.sh");
+
 	/*
 		LOG SOMETHING
 	*/
@@ -531,8 +574,22 @@ int dist(int x1, int y1, int x2, int y2) {
 	return abs(x1 - x2) + abs(y1 - y2);
 }
 
+
+#define CNT_READS 40
+int touchData[CNT_READS][2];
+
+
 int main()
 {
+
+	for (int i = 0; i < MAX_COMP; i++) {
+		updateStatus(i);
+		printf("%i ", c_status[i]);
+	}
+
+	printf("\n");
+	fflush(stdout);
+
     int speed = 1000000;
 
     // GPIO initialization
@@ -608,6 +665,12 @@ int main()
 	}
 
 	int d = 150;
+//	if (d > width / (cnt_w + 1) - 4) {
+//		d = width / (cnt_w + 1) - 4;
+//	}
+//	if (d > height / (cnt_h) - 4) {
+//		d = height / cnt_h - 4;
+//	}
 	{
 		defaultObject(&smallLogo);
 		smallLogo.priority = 1;
@@ -621,41 +684,100 @@ int main()
 	}
 
 	{
-		int cw = 5, ch = 3;
-		int tw = width / cw, th = height / ch;
+		int tw = width / (cnt_w + 1), th = height / cnt_h;
 		int dx = (tw - d) / 2;
 		int dy = (th - d) / 2;
 		if (dy < dx) dx = dy;
 		int ti = 0;
-		for (int i = 0; i < ch; i++) {
-			for (int j = 0; j < cw; j++) {
-				if (i == 0 && j == cw - 1) continue;
-				defaultObject(&computerIcon[ti]);
-				computerIcon[ti].priority = 1;
-				computerIcon[ti].data = ti;
-				computerIcon[ti].touch_event = 1;
-				int x1, y1, x2, y2;
-				x1 = j * width / cw;
-				y1 = i * height / ch;
-				x2 = (j + 1) * width / cw;
-				y2 = (i + 1) * height / ch;
-				setTouchArea(&computerIcon[ti], x1, y1, x2, y2);
-				addRect(&computerIcon[ti], x1 + dx, y1 + dx, x2 - dx, y2 - dx);
-				addBox(&computerIcon[ti], x1 + dx, y1 + dx, x2 - dx, y2 - dx, 2);
-				addText(&computerIcon[ti], x1 + tw / 2, -26, y1 + th / 2, 13, font, 50, 5);
-				updateColor(&computerIcon[ti], computerStatus(ti));
-				updateText(&computerIcon[ti], ti);
-				addObject(&computerIcon[ti], 0);
-				ti++;
+		for (int _ = 0; _ < 3; _++) {
+			for (int i = 0; i < cnt_h; i++) {
+				for (int j = 0; j < cnt_w; j++) {
+					defaultObject(&computerIcon[ti]);
+					computerIcon[ti].priority = 1;
+					computerIcon[ti].data = ti;
+					computerIcon[ti].touch_event = 1;
+					int x1, y1, x2, y2;
+					x1 = j * width / (cnt_w + 1);
+					y1 = i * height / cnt_h;
+					x2 = (j + 1) * width / (cnt_w + 1);
+					y2 = (i + 1) * height / cnt_h;
+					setTouchArea(&computerIcon[ti], x1, y1, x2, y2);
+					addRect(&computerIcon[ti], x1 + dx, y1 + dx, x2 - dx, y2 - dx);
+					addBox(&computerIcon[ti], x1 + dx, y1 + dx, x2 - dx, y2 - dx, 2);
+					addText(&computerIcon[ti], x1 + tw / 2, -26, y1 + th / 2, 13, font, 50, 5);
+					updateColor(&computerIcon[ti], computerStatus(ti));
+					updateText(&computerIcon[ti], ti);
+					if (_ > 0) {
+						computerIcon[ti].hide = 1;
+						computerIcon[ti].can_touch = 0;
+					}
+					addObject(&computerIcon[ti], 0);
+					ti++;
+				}
 			}
 		}
+
+		{
+			defaultObject(&computerIcon[ti]);
+			computerIcon[ti].priority = 1;
+			computerIcon[ti].data = ti;
+			computerIcon[ti].touch_event = 1;
+			int x1, y1, x2, y2;
+			x1 = 0 * width / (cnt_w + 1);
+			y1 = 0 * height / cnt_h;
+			x2 = (cnt_w) * width / (cnt_w + 1);
+			y2 = (cnt_h) * height / cnt_h;
+			setTouchArea(&computerIcon[ti], x1, y1, x2, y2);
+			addRect(&computerIcon[ti], x1 + dx, y1 + dx, x2 - dx, y2 - dx);
+			addBox(&computerIcon[ti], x1 + dx, y1 + dx, x2 - dx, y2 - dx, 2);
+			addText(&computerIcon[ti], (x1 + x2) / 2, -52, (y1 + y2) / 2, 26, font, 100, 5);
+			updateColor(&computerIcon[ti], computerStatus(ti));
+			updateText(&computerIcon[ti], ti);
+			computerIcon[ti].hide = 1;
+			computerIcon[ti].can_touch = 0;
+
+			addObject(&computerIcon[ti], 0);
+			ti++;
+		}
+
 		{
 			defaultObject(&timeTextObj);
-			timeTextObj.priority = 10;
+			timeTextObj.priority = 11;
 			timeText = addText(&timeTextObj, width, -115, 0, 40, font, 32, 5);
 			addObjectToAll(&timeTextObj);
 		}
-
+		{
+			defaultObject(&buttonL);
+			buttonL.priority = 10;
+			int x1, y1, x2, y2;
+			x1 = cnt_w * width / (cnt_w + 1);
+			y1 = (cnt_h - 2) * height / cnt_h;
+			x2 = (cnt_w + 1) * width / (cnt_w + 1);
+			y2 = (cnt_h - 1) * height / cnt_h;
+			setTouchArea(&buttonL, x1, y1, x2, y2);
+			addColorRect(&buttonL, x1 + dx, y1 + dx, x2 - dx, y2 - dx, 255, 255, 255, 255);
+			addBox(&buttonL, x1 + dx, y1 + dx, x2 - dx, y2 - dx, 2);
+			struct Text *tp = addText(&buttonL, (x1 + x2) / 2, -13, (y1 + y2) / 2, 13, font, 50, 1);
+			addChar(tp, '<');
+			buttonL.touch_event = 5;
+			addObject(&buttonL, 0);
+		}
+		{
+			defaultObject(&buttonR);
+			buttonR.priority = 11;
+			int x1, y1, x2, y2;
+			x1 = cnt_w * width / (cnt_w + 1);
+			y1 = (cnt_h - 1) * height / cnt_h;
+			x2 = (cnt_w + 1) * width / (cnt_w + 1);
+			y2 = cnt_h * height / cnt_h;
+			setTouchArea(&buttonR, x1, y1, x2, y2);
+			addColorRect(&buttonR, x1 + dx, y1 + dx, x2 - dx, y2 - dx, 255, 255, 255, 255);
+			addBox(&buttonR, x1 + dx, y1 + dx, x2 - dx, y2 - dx, 2);
+			struct Text *tp = addText(&buttonR, (x1 + x2) / 2, -13, (y1 + y2) / 2, 13, font, 50, 1);
+			addChar(tp, '>');
+			buttonR.touch_event = 6;
+			addObject(&buttonR, 0);
+		}
 
 		{
 			d = 82;
@@ -728,19 +850,22 @@ int main()
 	changeScene(0);
 	passwdText.texts[0].pswd = 0;
 
-#define CNT_READS 20
-	int touchData[CNT_READS][2];
-
-	for (int i = 0; i < CNT_READS; i++) touchData[i][0] = touchData[i][1] = width;
+	for (int i = 0; i < CNT_READS; i++) {
+		touchData[i][0] = touchData[i][1] = width;
+	}
 
 	struct Object tmp;
+
 	defaultObject(&tmp);
+
+
 	addColorBox(&tmp, 0, 0, 1, 1, 255, 0, 0, 128, 10);
 	tmp.priority = 20;
 	addObjectToAll(&tmp);
 
 	while (1)
     {
+
 		// REGISTER TOUCH INPUT
 		{
 			for (int i = CNT_READS - 1; i > 0; i--) {
@@ -751,7 +876,7 @@ int main()
 			touchData[0][1] = getValueY();
 			int g = 1;
 
-#define MANXATAN_SPREAD 200
+#define MANXATAN_SPREAD 70
 			for (int i = 0; i < CNT_READS; i++) {
 				if (touchData[i][0] >= width) g = 0;
 				if (!g) break;
