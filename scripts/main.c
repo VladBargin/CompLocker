@@ -369,7 +369,8 @@ int computerStatus(int id);
 void updateStatus(int i);
 char * idToName(int id);
 int logAttempt(int id, char * pswd);
-
+void openLock(int comp);
+void closeLock(int comp);
 
 void updateColor(struct Object * object, int status) {
 	int r, g, b;
@@ -401,6 +402,12 @@ void updateText(struct Object * object, int id) {
 void changeScene(int scene){
 	if ((current_scene == 0 && scene == 1) || (current_scene == 2 && scene == 0)) {
 		updateStatus(current_computer);
+	}
+
+	if (scene == 2) {
+		openLock(current_computer);
+	} else if (current_scene == 2) {
+		closeLock(current_computer);
 	}
 
 	current_scene = scene;
@@ -537,6 +544,16 @@ int correctPassword(int id, char * pswd) {
 	printf("PSWD RES: %i    pswd: |%s|  %s\n", res, pswd, command);
 	fflush(stdout);
 	return res;
+}
+
+void openLock(int comp) {
+	sprintf(command, "python openLock.py %i", comp);
+	system(command);
+}
+
+void closeLock(int comp) {
+	sprintf(command, "python closeLock.py %i", comp);
+	system(command);
 }
 
 // 0 - unsuccessful attempt, 1 - successful attempt
